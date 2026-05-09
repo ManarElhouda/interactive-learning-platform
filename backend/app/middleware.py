@@ -13,7 +13,7 @@ def setup_middleware(app: FastAPI) -> None:
     # CORS middleware - allow requests from frontend
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.allowed_origins,
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -21,7 +21,8 @@ def setup_middleware(app: FastAPI) -> None:
     )
 
     # Trusted host middleware for security
+    allowed_hosts = ["localhost", "127.0.0.1", "*.up.railway.app"]
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["localhost", "127.0.0.1", settings.frontend_url],
+        allowed_hosts=allowed_hosts,
     )
