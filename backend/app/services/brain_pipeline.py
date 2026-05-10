@@ -1,169 +1,378 @@
-"""Brain anomaly detection pipeline for DS MRI inference."""
+"""Brain anomaly detection pipeline for DS MRI inference.
+Architecture exactement identique à la notebook Brain__7_.ipynb
+"""
 
 import base64
 import io
+import math
 from dataclasses import dataclass
-from typing import Any
 
-from huggingface_hub import hf_hub_download
-from PIL import Image
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from huggingface_hub import hf_hub_download
+from PIL import Image
+from scipy.ndimage import binary_erosion, binary_fill_holes, gaussian_filter, label
+from skimage.exposure import match_histograms
 
+
+# ─────────────────────────────────────────────
+# 1. ARCHITECTURE UNET (identique à la notebook)
+# ─────────────────────────────────────────────
 
 class SinusoidalPosEmb(nn.Module):
-    """Sinusoidal timestep embedding."""
+    """Sinusoidal timestep embedding — identique notebook."""
 
     def __init__(self, dim: int):
         super().__init__()
         self.dim = dim
 
-    def forward(self, time: torch.Tensor) -> torch.Tensor:
-        device = time.device
+    def forward(self, t: torch.Tensor) -> torch.Tensor:
+        device = t.device
         half_dim = self.dim // 2
-        emb = torch.exp(-torch.arange(half_dim, device=device).float() * (np.log(10000) / (half_dim - 1)))
-        emb = time[:, None].float() * emb[None, :]
+        emb = math.log(10000) / (half_dim - 1)
+        emb = torch.exp(torch.arange(half_dim, device=device) * -emb)
+        emb = t[:, None] * emb[None, :]
         return torch.cat((emb.sin(), emb.cos()), dim=-1)
 
 
 class ResBlock(nn.Module):
-    """UNet residual block with time embedding."""
+    """UNet residual block — identique notebook."""
 
     def __init__(self, in_ch: int, out_ch: int, temb_dim: int):
         super().__init__()
+        self.conv1 = nn.Conv2d(in_ch, out_ch, 3, padding=1)
+        self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
+        self.emb   = nn.Linear(temb_dim, out_ch)
         self.norm1 = nn.GroupNorm(8, out_ch)
-        self.conv1 = nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1)
         self.norm2 = nn.GroupNorm(8, out_ch)
-        self.conv2 = nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1)
-        self.time_proj = nn.Linear(temb_dim, out_ch)
-        self.skip = nn.Conv2d(in_ch, out_ch, kernel_size=1) if in_ch != out_ch else nn.Identity()
+        self.act   = nn.SiLU()
+        self.skip  = nn.Conv2d(in_ch, out_ch, 1) if in_ch != out_ch else nn.Identity()
 
-    def forward(self, x: torch.Tensor, temb: torch.Tensor) -> torch.Tensor:
-        h = self.conv1(x)
-        h = self.norm1(h)
-        h = F.silu(h)
-        h = h + self.time_proj(F.silu(temb))[:, :, None, None]
-        h = self.norm2(h)
-        h = F.silu(h)
-        h = self.conv2(h)
+    def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        h = self.act(self.norm1(self.conv1(x)))
+        h = h + self.emb(t)[:, :, None, None]
+        h = self.act(self.norm2(self.conv2(h)))
         return h + self.skip(x)
 
 
 class UNet(nn.Module):
-    """Small UNet for grayscale diffusion denoising."""
+    """UNet pour le débruitage DDPM/DDIM — identique notebook."""
 
     def __init__(self, in_ch: int = 1, base: int = 32, temb_dim: int = 128):
         super().__init__()
-        self.time_emb = nn.Sequential(SinusoidalPosEmb(temb_dim), nn.Linear(temb_dim, temb_dim), nn.SiLU())
-        self.init_conv = nn.Conv2d(in_ch, base, kernel_size=3, padding=1)
-        self.down1 = ResBlock(base, base * 2, temb_dim)
-        self.down2 = ResBlock(base * 2, base * 4, temb_dim)
-        self.down3 = ResBlock(base * 4, base * 8, temb_dim)
-        self.bot = ResBlock(base * 8, base * 8, temb_dim)
-        self.up3 = ResBlock(base * 16, base * 4, temb_dim)
-        self.up2 = ResBlock(base * 8, base * 2, temb_dim)
-        self.up1 = ResBlock(base * 4, base, temb_dim)
-        self.out_conv = nn.Conv2d(base, in_ch, kernel_size=1)
-        self.pool = nn.AvgPool2d(2)
-        self.upsample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
+        c1, c2, c3, c4 = base, base * 2, base * 4, base * 8
+
+        # ✅ temb_mlp avec SinusoidalPosEmb(base=32) comme dans la notebook
+        self.temb_mlp = nn.Sequential(
+            SinusoidalPosEmb(base),
+            nn.Linear(base, temb_dim),
+            nn.SiLU(),
+            nn.Linear(temb_dim, temb_dim),
+        )
+
+        self.init_conv = nn.Conv2d(in_ch, c1, 3, padding=1)
+
+        self.down1 = ResBlock(c1, c2, temb_dim)
+        self.pool1 = nn.Conv2d(c2, c2, 4, 2, 1)
+
+        self.down2 = ResBlock(c2, c3, temb_dim)
+        self.pool2 = nn.Conv2d(c3, c3, 4, 2, 1)
+
+        self.down3 = ResBlock(c3, c4, temb_dim)
+        self.pool3 = nn.Conv2d(c4, c4, 4, 2, 1)
+
+        self.mid1 = ResBlock(c4, c4, temb_dim)
+        self.mid2 = ResBlock(c4, c4, temb_dim)
+
+        self.up3    = nn.Sequential(nn.Upsample(scale_factor=2), nn.Conv2d(c4, c3, 3, padding=1))
+        self.upres3 = ResBlock(c3 + c4, c3, temb_dim)
+
+        self.up2    = nn.Sequential(nn.Upsample(scale_factor=2), nn.Conv2d(c3, c2, 3, padding=1))
+        self.upres2 = ResBlock(c2 + c3, c2, temb_dim)
+
+        self.up1    = nn.Sequential(nn.Upsample(scale_factor=2), nn.Conv2d(c2, c1, 3, padding=1))
+        self.upres1 = ResBlock(c1 + c2, c1, temb_dim)
+
+        self.out_norm = nn.GroupNorm(8, c1)
+        self.out_conv = nn.Conv2d(c1, in_ch, 1)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
-        temb = self.time_emb(t)
-        h1 = self.init_conv(x)
-        h2 = self.down1(h1, temb)
-        h3 = self.down2(self.pool(h2), temb)
-        h4 = self.down3(self.pool(h3), temb)
-        h5 = self.bot(self.pool(h4), temb)
-        u4 = self.up3(torch.cat([self.upsample(h5), h4], dim=1), temb)
-        u3 = self.up2(torch.cat([self.upsample(u4), h3], dim=1), temb)
-        u2 = self.up1(torch.cat([self.upsample(u3), h2], dim=1), temb)
-        return self.out_conv(u2)
+        te = self.temb_mlp(t)
 
+        x0 = self.init_conv(x)
+
+        x1 = self.down1(x0, te); d1 = x1; x1 = self.pool1(x1)
+        x2 = self.down2(x1, te); d2 = x2; x2 = self.pool2(x2)
+        x3 = self.down3(x2, te); d3 = x3; x3 = self.pool3(x3)
+
+        x3 = self.mid2(self.mid1(x3, te), te)
+
+        x3 = self.upres3(torch.cat([self.up3(x3), d3], dim=1), te)
+        x3 = self.upres2(torch.cat([self.up2(x3), d2], dim=1), te)
+        x3 = self.upres1(torch.cat([self.up1(x3), d1], dim=1), te)
+
+        return self.out_conv(F.silu(self.out_norm(x3)))
+
+
+# ─────────────────────────────────────────────
+# 2. CLASSIFIER (identique notebook)
+# ─────────────────────────────────────────────
 
 class DiffusionClassifier(nn.Module):
-    """Classifier for EU vs DS probability guidance."""
+    """Classifier EU=0 / DS=1 pour guider le débruitage DDIM."""
 
     def __init__(self, base: int = 32, temb_dim: int = 128):
         super().__init__()
-        self.time_emb = nn.Sequential(SinusoidalPosEmb(temb_dim), nn.Linear(temb_dim, temb_dim), nn.SiLU())
-        self.stem = nn.Sequential(
-            nn.Conv2d(1, base, kernel_size=3, padding=1),
-            nn.GroupNorm(8, base),
+        self.temb = nn.Sequential(
+            SinusoidalPosEmb(base),
+            nn.Linear(base, temb_dim),
             nn.SiLU(),
-            nn.AvgPool2d(2),
         )
-        self.block1 = ResBlock(base, base * 2, temb_dim)
-        self.block2 = ResBlock(base * 2, base * 4, temb_dim)
-        self.block3 = ResBlock(base * 4, base * 4, temb_dim)
-        self.head = nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)), nn.Flatten(), nn.Linear(base * 4, 2))
+        self.encoder = nn.Sequential(
+            nn.Conv2d(1, base,      3, 2, 1), nn.GroupNorm(8, base),      nn.SiLU(),
+            nn.Conv2d(base, base*2, 3, 2, 1), nn.GroupNorm(8, base*2),    nn.SiLU(),
+            nn.Conv2d(base*2, base*4, 3, 2, 1), nn.GroupNorm(8, base*4),  nn.SiLU(),
+            nn.Conv2d(base*4, base*8, 3, 2, 1), nn.GroupNorm(8, base*8),  nn.SiLU(),
+            nn.AdaptiveAvgPool2d(1),
+        )
+        self.head = nn.Linear(base * 8 + temb_dim, 2)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
-        temb = self.time_emb(t)
-        h = self.stem(x)
-        h = self.block1(h, temb)
-        h = self.block2(self.pool(h), temb)
-        h = self.block3(self.pool(h), temb)
-        return self.head(h)
-
-    @property
-    def pool(self) -> nn.Module:
-        return nn.AvgPool2d(2)
+        feat = self.encoder(x).flatten(1)       # (B, 256)
+        te   = self.temb(t)                      # (B, 128)
+        return self.head(torch.cat([feat, te], 1))
 
 
-class GradCAM_UNet(nn.Module):
-    """Deterministic GradCAM-like overlay from the anomaly map."""
-
-    def forward(self, anomaly: torch.Tensor) -> torch.Tensor:
-        anomaly = anomaly.squeeze(1)  # [1, 128, 128]
-        blurred = self._gaussian_blur(anomaly.unsqueeze(1), kernel_size=21, sigma=5)
-        norm = (blurred - blurred.min()) / (blurred.max() - blurred.min() + 1e-8)
-        return norm.squeeze(1)
-
-    @staticmethod
-    def _gaussian_blur(x: torch.Tensor, kernel_size: int = 11, sigma: float = 3.0) -> torch.Tensor:
-        kernel = GradCAM_UNet._make_gaussian_kernel(kernel_size, sigma, x.device)
-        padding = kernel_size // 2
-        return F.conv2d(x, kernel, padding=padding)
-
-    @staticmethod
-    def _make_gaussian_kernel(kernel_size: int, sigma: float, device: torch.device) -> torch.Tensor:
-        coords = torch.arange(kernel_size, dtype=torch.float32, device=device) - (kernel_size - 1) / 2
-        kernel1d = torch.exp(-(coords**2) / (2 * sigma**2))
-        kernel1d = kernel1d / kernel1d.sum()
-        kernel2d = kernel1d[:, None] * kernel1d[None, :]
-        return kernel2d[None, None, :, :]
-
+# ─────────────────────────────────────────────
+# 3. DDPM (identique notebook)
+# ─────────────────────────────────────────────
 
 class DDPM:
-    """Base DDPM noise schedule and helpers."""
+    """Noise schedule DDPM/DDIM."""
 
-    def __init__(self, T: int = 1000):
-        self.T = T
-        betas = torch.linspace(1e-4, 0.02, T)
-        alphas = 1.0 - betas
-        alphas_cumprod = torch.cumprod(alphas, dim=0)
-        self.register_buffers(alphas, alphas_cumprod)
+    def __init__(self, T: int = 1000, device: str = "cpu"):
+        self.T      = T
+        self.device = device
+        b  = torch.linspace(1e-4, 0.02, T)
+        a  = 1 - b
+        ab = torch.cumprod(a, 0)
+        self.betas      = b.to(device)
+        self.alphas     = a.to(device)
+        self.alpha_bar  = ab.to(device)
 
-    def register_buffers(self, alphas: torch.Tensor, alphas_cumprod: torch.Tensor) -> None:
-        self.alphas = alphas
-        self.alphas_cumprod = alphas_cumprod
-        self.sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
-        self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1.0 - alphas_cumprod)
-        self.alphas_cumprod_prev = torch.cat([torch.tensor([1.0]), alphas_cumprod[:-1]])
+    def ddim_timesteps(self, L: int) -> list:
+        step = self.T // L
+        return list(range(0, self.T, step))
 
-    def q_sample(self, x_start: torch.Tensor, t: torch.Tensor, noise: torch.Tensor | None = None) -> torch.Tensor:
-        if noise is None:
-            noise = torch.randn_like(x_start)
-        return self.sqrt_alphas_cumprod[t][:, None, None, None] * x_start + self.sqrt_one_minus_alphas_cumprod[t][:, None, None, None] * noise
 
-    def ddim_timesteps(self, L: int) -> torch.Tensor:
-        return torch.linspace(0, self.T - 1, steps=L, dtype=torch.long)
+# ─────────────────────────────────────────────
+# 4. GRADCAM (identique notebook — déterministe)
+# ─────────────────────────────────────────────
+
+class GradCAM_UNet:
+    """GradCAM déterministe basé sur l'anomaly map — identique notebook."""
+
+    def __init__(self, model: nn.Module):
+        self.model = model
+
+    def generate(
+        self,
+        xt: torch.Tensor,
+        t: torch.Tensor,
+        brain_mask: np.ndarray | None = None,
+        anomaly_map: np.ndarray | None = None,
+    ) -> np.ndarray:
+        if anomaly_map is None:
+            return np.zeros((128, 128))
+
+        cam = anomaly_map.copy()
+        cam = gaussian_filter(cam, sigma=3)
+
+        if brain_mask is not None:
+            cam[~brain_mask] = 0.0
+            brain_cam = cam[brain_mask]
+            if brain_cam.max() > 0:
+                p10 = np.percentile(brain_cam, 10)
+                p99 = np.percentile(brain_cam, 99)
+                cam = np.clip((cam - p10) / (p99 - p10 + 1e-8), 0, 1)
+                cam = np.power(cam, 0.5)
+            cam[~brain_mask] = 0.0
+
+        return cam
+
+
+# ─────────────────────────────────────────────
+# 5. FONCTIONS PIPELINE (identiques notebook)
+# ─────────────────────────────────────────────
+
+def get_brain_mask(image_np: np.ndarray, threshold: float = 0.18) -> np.ndarray:
+    """Extrait le masque du cerveau — identique notebook."""
+    mask = image_np > threshold
+    labeled_arr, n = label(mask)
+    if n > 1:
+        sizes = [(labeled_arr == i).sum() for i in range(1, n + 1)]
+        largest = np.argmax(sizes) + 1
+        mask = labeled_arr == largest
+    mask = binary_fill_holes(mask)
+    mask = binary_erosion(mask, iterations=2)
+    return mask.astype(bool)
+
+
+def ddim_inversion(x0: torch.Tensor, model: nn.Module, ddpm: DDPM, L: int = 200) -> torch.Tensor:
+    """Encode x0 → xT — identique notebook."""
+    model.eval()
+    device    = x0.device
+    timesteps = ddpm.ddim_timesteps(L)
+    xt        = x0.clone().to(device)
+
+    for i in range(len(timesteps) - 1):
+        t_curr = timesteps[i]
+        t_next = timesteps[i + 1]
+        t_t    = torch.tensor([t_curr], device=device, dtype=torch.long)
+
+        with torch.no_grad():
+            eps = model(xt, t_t)
+
+        ab_c    = ddpm.alpha_bar[t_curr]
+        ab_n    = ddpm.alpha_bar[t_next]
+        x0_pred = ((xt - (1 - ab_c).sqrt() * eps) / ab_c.sqrt()).clamp(-1, 1)
+        xt      = ab_n.sqrt() * x0_pred + (1 - ab_n).sqrt() * eps
+
+    return xt
+
+
+def ddim_guided_denoising(
+    xT: torch.Tensor,
+    model: nn.Module,
+    classifier: nn.Module,
+    ddpm: DDPM,
+    L: int = 200,
+    guidance_scale: float = 3.0,
+) -> torch.Tensor:
+    """Débruite xT → x0 avec guidance EU — identique notebook."""
+    model.eval()
+    device    = xT.device
+    timesteps = list(reversed(ddpm.ddim_timesteps(L)))
+    xt        = xT.clone().to(device)
+
+    for i in range(len(timesteps) - 1):
+        t_curr = timesteps[i]
+        t_prev = timesteps[i + 1]
+        t_t    = torch.tensor([t_curr], device=device, dtype=torch.long)
+
+        # Gradient du classifier
+        xt_g  = xt.detach().requires_grad_(True)
+        logit = classifier(xt_g, t_t)
+        log_p = F.log_softmax(logit, dim=-1)[:, 0]
+        grad  = torch.autograd.grad(log_p.sum(), xt_g)[0].detach()
+
+        # Prédiction bruit UNet
+        with torch.no_grad():
+            eps = model(xt, t_t)
+
+        # Eps guidé
+        ab_c  = ddpm.alpha_bar[t_curr]
+        eps_g = eps - guidance_scale * (1 - ab_c).sqrt() * grad
+
+        # Pas DDIM
+        ab_p    = ddpm.alpha_bar[t_prev]
+        x0_pred = ((xt - (1 - ab_c).sqrt() * eps_g) / ab_c.sqrt()).clamp(-1, 1)
+        xt      = ab_p.sqrt() * x0_pred + (1 - ab_p).sqrt() * eps_g
+
+    return xt.clamp(-1, 1)
+
+
+def histogram_matching(reconstruction: torch.Tensor, original: torch.Tensor) -> torch.Tensor:
+    """Histogram matching post-traitement — identique notebook."""
+    device  = original.device
+    rec_np  = ((reconstruction.squeeze().cpu().numpy() + 1) / 2).clip(0, 1)
+    orig_np = ((original.squeeze().cpu().numpy() + 1) / 2).clip(0, 1)
+    matched = match_histograms(rec_np, orig_np)
+    matched_t = torch.from_numpy((matched * 2 - 1).astype(np.float32))
+    return matched_t.unsqueeze(0).unsqueeze(0).to(device)
+
+
+def compute_anomaly_map(
+    original: torch.Tensor,
+    reconstruction_hm: torch.Tensor,
+    smooth_sigma: float = 2.0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Calcule l'anomaly map normalisée — identique notebook."""
+    orig_np = original.squeeze().cpu().numpy()
+    rec_np  = reconstruction_hm.squeeze().cpu().numpy()
+
+    # Brain mask
+    orig_01    = (orig_np + 1) / 2
+    brain_mask = get_brain_mask(orig_01)
+
+    # Différence lissée
+    diff        = np.abs(orig_np - rec_np)
+    diff_smooth = gaussian_filter(diff, sigma=smooth_sigma)
+    diff_smooth = diff_smooth * brain_mask
+
+    # Normalisation
+    brain_pixels = diff_smooth[brain_mask]
+    if brain_pixels.max() > 0:
+        amap = diff_smooth / (brain_pixels.max() + 1e-8)
+    else:
+        amap = diff_smooth
+
+    return np.clip(amap, 0, 1), brain_mask
+
+
+# ─────────────────────────────────────────────
+# 6. HELPERS PNG / IMAGE
+# ─────────────────────────────────────────────
+
+def numpy_heatmap_to_base64(array: np.ndarray, cmap_name: str = "hot") -> str:
+    """Convertit un numpy array [0,1] en PNG base64 coloré (hot/jet)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(2, 2), dpi=64)
+    ax.imshow(array, cmap=cmap_name, vmin=0, vmax=1)
+    ax.axis("off")
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+    plt.close(fig)
+    buf.seek(0)
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
+
+
+def numpy_gradcam_to_base64(cam: np.ndarray, orig_np: np.ndarray, brain_mask: np.ndarray) -> str:
+    """GradCAM coloré (jet) superposé sur l'original — identique notebook."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    cam_masked = cam.copy().astype(float)
+    cam_masked[~brain_mask] = np.nan
+
+    cmap_jet = plt.get_cmap("jet").copy()
+    cmap_jet.set_bad(alpha=0)
+
+    fig, ax = plt.subplots(figsize=(2, 2), dpi=64)
+    ax.imshow(orig_np, cmap="gray")
+    ax.imshow(cam_masked, cmap=cmap_jet, alpha=0.6, vmin=0, vmax=1, interpolation="bilinear")
+    ax.axis("off")
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+    plt.close(fig)
+    buf.seek(0)
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
 
 def tensor_to_base64_png(tensor: torch.Tensor) -> str:
-    pixels = tensor.clamp(-1.0, 1.0).add(1.0).div(2.0).mul(255.0).round().to(torch.uint8).squeeze().cpu().numpy()
+    """Tensor [-1,1] → PNG base64 niveaux de gris."""
+    pixels = (
+        tensor.clamp(-1.0, 1.0).add(1.0).div(2.0).mul(255.0)
+        .round().to(torch.uint8).squeeze().cpu().numpy()
+    )
     image = Image.fromarray(pixels, mode="L")
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
@@ -172,114 +381,113 @@ def tensor_to_base64_png(tensor: torch.Tensor) -> str:
 
 def load_image_bytes(image_bytes: bytes, device: torch.device) -> torch.Tensor:
     with Image.open(io.BytesIO(image_bytes)) as image:
-        image = image.convert("L").resize((128, 128), Image.LANCZOS)
-        array = np.array(image, dtype=np.float32) / 255.0
+        image  = image.convert("L").resize((128, 128), Image.LANCZOS)
+        array  = np.array(image, dtype=np.float32) / 255.0
         tensor = torch.from_numpy(array).unsqueeze(0).unsqueeze(0).to(device)
     return tensor * 2.0 - 1.0
 
 
-def match_histogram(image: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    src = image
-    src_mean, src_std = src.mean(), src.std(unbiased=False)
-    target_mean, target_std = target.mean(), target.std(unbiased=False)
-    scale = target_std / (src_std + 1e-8)
-    return ((src - src_mean) * scale + target_mean).clamp(-1.0, 1.0)
-
-
-def compute_anomaly_map(original: torch.Tensor, reconstruction: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, float]:
-    anomaly = torch.abs(original - reconstruction)
-    brain_mask = (original > -0.05).float()
-    masked = anomaly * brain_mask
-    score = masked.sum() / (brain_mask.sum() + 1e-8)
-    return masked, brain_mask, score.item()
-
+# ─────────────────────────────────────────────
+# 7. DATACLASS RÉSULTAT
+# ─────────────────────────────────────────────
 
 @dataclass
 class PredictionResult:
     score: float
     label: str
-    anomaly_map: str
-    reconstruction: str
-    gradcam: str
+    anomaly_map: str       # PNG base64 coloré (hot)
+    reconstruction: str    # PNG base64 gris
+    gradcam: str           # PNG base64 coloré (jet)
 
+
+# ─────────────────────────────────────────────
+# 8. PIPELINE PRINCIPAL
+# ─────────────────────────────────────────────
 
 class BrainPipeline:
-    """Complete inference pipeline for DS brain anomaly detection."""
+    """Pipeline complet identique à la notebook Brain__7_.ipynb."""
 
     def __init__(self) -> None:
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.diffusion = DDPM()
-        self.unet = None
+        self.device     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.diffusion  = DDPM(T=1000, device=str(self.device))
+        self.unet       = None
         self.classifier = None
-        self.gradcam = GradCAM_UNet()
 
     def _ensure_models_loaded(self) -> None:
-        """Lazy load models on first use."""
         if self.unet is None:
-            self.unet = self._load_model("zienebo/ds-brain-detection", "unet_diffusion.pth", UNet)
+            self.unet = self._load_model(
+                "zienebo/ds-brain-detection", "unet_diffusion.pth", UNet
+            )
         if self.classifier is None:
-            self.classifier = self._load_model("zienebo/ds-brain-detection", "classifier.pth", DiffusionClassifier)
+            self.classifier = self._load_model(
+                "zienebo/ds-brain-detection", "classifier.pth", DiffusionClassifier
+            )
 
-    def _load_model(self, repo_id: str, filename: str, model_cls: type[torch.nn.Module]) -> torch.nn.Module:
-        print(f"Loading model {filename} from {repo_id}")
+    def _load_model(self, repo_id: str, filename: str, model_cls: type) -> nn.Module:
+        print(f"Loading {filename} from {repo_id}...")
         try:
             model_path = hf_hub_download(repo_id=repo_id, filename=filename)
-            print(f"Downloaded to {model_path}")
-            model = model_cls().to(self.device)
-            state = torch.load(model_path, map_location=self.device)
+            model      = model_cls().to(self.device)
+            state      = torch.load(model_path, map_location=self.device)
             model.load_state_dict(state, strict=False)
             model.eval()
-            print(f"Model {filename} loaded successfully")
+            print(f"✅ {filename} chargé")
             return model
         except Exception as e:
-            print(f"Error loading model {filename}: {e}")
+            print(f"❌ Erreur chargement {filename}: {e}")
             raise
 
-    def ddim_inversion(self, x0: torch.Tensor, L: int = 200) -> torch.Tensor:
-        timesteps = self.diffusion.ddim_timesteps(L)
-        noise = torch.randn_like(x0, device=self.device)
-        x = x0
-        for t in timesteps:
-            alpha = self.diffusion.sqrt_alphas_cumprod[t]
-            x = alpha * x0 + self.diffusion.sqrt_one_minus_alphas_cumprod[t] * noise
-        return x
-
-    def ddim_guided_denoising(self, xT: torch.Tensor, L: int = 200, guidance_scale: float = 3.0) -> torch.Tensor:
-        x = xT.detach().clone()
-        timesteps = self.diffusion.ddim_timesteps(L)
-        for index in reversed(range(len(timesteps))):
-            t = timesteps[index].unsqueeze(0).to(self.device)
-            x = x.detach().requires_grad_(True)
-            eps = self.unet(x, t)
-            logits = self.classifier(x, t)
-            log_probs = F.log_softmax(logits, dim=-1)
-            logp_eu = log_probs[:, 0].sum()
-            grad = torch.autograd.grad(logp_eu, x)[0]
-            guided_eps = eps - guidance_scale * self.diffusion.sqrt_one_minus_alphas_cumprod[t] * grad
-            alpha_t = self.diffusion.sqrt_alphas_cumprod[t]
-            x0_pred = (x - self.diffusion.sqrt_one_minus_alphas_cumprod[t] * guided_eps) / (alpha_t + 1e-8)
-            prev_alpha = self.diffusion.sqrt_alphas_cumprod[0] if index == 0 else self.diffusion.sqrt_alphas_cumprod[timesteps[index - 1]]
-            x = prev_alpha * x0_pred + self.diffusion.sqrt_one_minus_alphas_cumprod[t] * guided_eps
-        return x.detach()
-
-    def run_full_pipeline(self, image_bytes: bytes, L: int = 200, guidance_scale: float = 3.0) -> PredictionResult:
+    def run_full_pipeline(
+        self,
+        image_bytes: bytes,
+        L: int = 200,
+        guidance_scale: float = 3.0,
+    ) -> PredictionResult:
         self._ensure_models_loaded()
-        x0 = load_image_bytes(image_bytes, self.device)
-        xT = self.ddim_inversion(x0, L=L)
-        reconstruction = self.ddim_guided_denoising(xT, L=L, guidance_scale=guidance_scale)
-        reconstruction = match_histogram(reconstruction, x0)
-        anomaly_map, _, score = compute_anomaly_map(x0, reconstruction)
-        gradcam_map = self.gradcam(anomaly_map)
 
+        # Charger l'image
+        x0 = load_image_bytes(image_bytes, self.device)
+
+        # [1/4] DDIM Inversion
+        print("  [1/4] DDIM Inversion...")
+        xT = ddim_inversion(x0, self.unet, self.diffusion, L=L)
+
+        # [2/4] Guided Denoising
+        print("  [2/4] Guided Denoising...")
+        reconstruction = ddim_guided_denoising(
+            xT, self.unet, self.classifier, self.diffusion,
+            L=L, guidance_scale=guidance_scale,
+        )
+
+        # [3/4] Histogram Matching
+        print("  [3/4] Histogram Matching...")
+        rec_hm = histogram_matching(reconstruction, x0)
+
+        # [4/4] Anomaly Map + GradCAM
+        print("  [4/4] Anomaly Map + GradCAM...")
+        amap, brain_mask = compute_anomaly_map(x0, rec_hm)
+
+        gradcam_engine = GradCAM_UNet(self.unet)
+        t_mid = torch.tensor([self.diffusion.T // 2], device=self.device, dtype=torch.long)
+        cam_map = gradcam_engine.generate(x0, t_mid, brain_mask=brain_mask, anomaly_map=amap)
+
+        # Score
+        brain_pixels = amap[brain_mask] if brain_mask is not None else amap.ravel()
+        score = float(brain_pixels.mean())
         label = "DS Detected" if score > 0.18 else "Normal"
+        print(f"  Score: {score:.4f} → {label}")
+
+        # Numpy original pour GradCAM overlay
+        orig_np = ((x0.squeeze().cpu().numpy() + 1) / 2).clip(0, 1)
 
         return PredictionResult(
             score=round(score, 4),
             label=label,
-            anomaly_map=tensor_to_base64_png(anomaly_map),
-            reconstruction=tensor_to_base64_png(reconstruction),
-            gradcam=tensor_to_base64_png(gradcam_map),
+            anomaly_map=numpy_heatmap_to_base64(amap, cmap_name="hot"),
+            reconstruction=tensor_to_base64_png(rec_hm),
+            gradcam=numpy_gradcam_to_base64(cam_map, orig_np, brain_mask),
         )
 
 
+# Instance globale
 brain_pipeline = BrainPipeline()
