@@ -18,6 +18,21 @@ bcrypt==4.1.2
 # Environment
 python-dotenv==1.0.0
 
+# ML
+huggingface-hub==0.20.3
+torch==2.2.0
+Pillow==10.1.0
+numpy==1.24.3
+
+# Medical inference pipeline
+torch>=2.0.0
+torchvision>=0.15.0
+huggingface-hub>=0.16.4
+numpy>=1.26.0
+Pillow>=10.0.0
+scikit-image>=0.22.0
+python-multipart>=0.0.6
+
 # Development dependencies (optional, install with: pip install -r requirements-dev.txt)
 # pytest==7.4.3
 # pytest-asyncio==0.21.1
