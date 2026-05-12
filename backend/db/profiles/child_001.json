@@ -1,0 +1,28 @@
+{
+  "child_id": "child_001",
+  "name": "Enfant",
+  "age": 8,
+  "cognitive_level": "intermediate",
+  "preferred_colors": [
+    "blue",
+    "yellow",
+    "green"
+  ],
+  "interests": [
+    "animals",
+    "nature",
+    "sport"
+  ],
+  "language": "tunisian_arabic",
+  "style_preference": "cartoon",
+  "blacklist": [
+    "yellow"
+  ],
+  "positive_keywords": [
+    "yellow",
+    "cat"
+  ],
+  "created_at": "2026-05-11T21:02:17.936947",
+  "updated_at": "2026-05-12T00:47:01.620687",
+  "version": 1
+}

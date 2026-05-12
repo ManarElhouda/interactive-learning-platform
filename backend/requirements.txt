@@ -1,20 +1,62 @@
+# -------------------------
+# Core dependencies
+# -------------------------
 fastapi>=0.104.1
 uvicorn[standard]>=0.24.0
+
+# -------------------------
+# Database
+# -------------------------
 sqlalchemy>=2.0.23
 alembic>=1.12.1
+
+# -------------------------
+# Data validation
+# -------------------------
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
+
+# -------------------------
+# Auth
+# -------------------------
 PyJWT>=2.8.0
 passlib[bcrypt]>=1.7.4
-bcrypt==4.0.1
+bcrypt>=4.1.2
+
+# -------------------------
+# Environment variables
+# -------------------------
 python-dotenv>=1.0.0
+
+# -------------------------
+# AI / LLM
+# -------------------------
+groq>=0.9.0
 huggingface-hub>=0.20.3
+
+# -------------------------
+# ML / DL stack
+# -------------------------
 torch>=2.2.0
-Pillow>=10.1.0
-numpy>=1.24.3,<2.0
 torchvision>=0.15.0
+numpy>=1.24.3,<2.0
 scipy>=1.10.0
 scikit-image>=0.22.0
+Pillow>=10.1.0
 matplotlib>=3.7.0
+
+# -------------------------
+# File handling / APIs
+# -------------------------
 python-multipart>=0.0.6
 aiofiles>=23.0.0
+httpx>=0.25.2
+
+# -------------------------
+# Dev dependencies (optionnel)
+# -------------------------
+# pytest>=7.4.3
+# pytest-asyncio>=0.21.1
+# black>=23.12.0
+# pylint>=3.0.3
+# mypy>=1.7.1

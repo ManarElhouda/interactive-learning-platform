@@ -9,7 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SelectChildRouteImport } from './routes/select-child'
 import { Route as ParentRouteImport } from './routes/parent'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LearnRouteImport } from './routes/learn'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
@@ -22,9 +25,24 @@ import { Route as LearnTalkRouteImport } from './routes/learn.talk'
 import { Route as LearnPictureRouteImport } from './routes/learn.picture'
 import { Route as LearnExercisesRouteImport } from './routes/learn.exercises'
 
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SelectChildRoute = SelectChildRouteImport.update({
+  id: '/select-child',
+  path: '/select-child',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ParentRoute = ParentRouteImport.update({
   id: '/parent',
   path: '/parent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LearnRoute = LearnRouteImport.update({
@@ -90,6 +108,8 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
+  '/select-child': typeof SelectChildRoute
+  '/signup': typeof SignupRoute
   '/learn/exercises': typeof LearnExercisesRoute
   '/learn/picture': typeof LearnPictureRoute
   '/learn/talk': typeof LearnTalkRoute
@@ -103,6 +123,8 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
+  '/select-child': typeof SelectChildRoute
+  '/signup': typeof SignupRoute
   '/learn/exercises': typeof LearnExercisesRoute
   '/learn/picture': typeof LearnPictureRoute
   '/learn/talk': typeof LearnTalkRoute
@@ -118,6 +140,8 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
+  '/select-child': typeof SelectChildRoute
+  '/signup': typeof SignupRoute
   '/learn/exercises': typeof LearnExercisesRoute
   '/learn/picture': typeof LearnPictureRoute
   '/learn/talk': typeof LearnTalkRoute
@@ -134,6 +158,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/select-child'
     | '/parent'
+    | '/select-child'
+    | '/signup'
     | '/learn/exercises'
     | '/learn/picture'
     | '/learn/talk'
@@ -147,6 +173,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/select-child'
     | '/parent'
+    | '/select-child'
+    | '/signup'
     | '/learn/exercises'
     | '/learn/picture'
     | '/learn/talk'
@@ -161,6 +189,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/select-child'
     | '/parent'
+    | '/select-child'
+    | '/signup'
     | '/learn/exercises'
     | '/learn/picture'
     | '/learn/talk'
@@ -176,10 +206,26 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SelectChildRoute: typeof SelectChildRoute
   ParentRoute: typeof ParentRoute
+  SelectChildRoute: typeof SelectChildRoute
+  SignupRoute: typeof SignupRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/select-child': {
+      id: '/select-child'
+      path: '/select-child'
+      fullPath: '/select-child'
+      preLoaderRoute: typeof SelectChildRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/parent': {
       id: '/parent'
       path: '/parent'
@@ -192,13 +238,6 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/select-child': {
@@ -294,6 +333,8 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SelectChildRoute: SelectChildRoute,
   ParentRoute: ParentRoute,
+  SelectChildRoute: SelectChildRoute,
+  SignupRoute: SignupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
