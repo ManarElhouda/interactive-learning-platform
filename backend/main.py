@@ -1,17 +1,22 @@
 """Main FastAPI application."""
-
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
-
 from app.api.routes import api_router
+from app.api.routes.pipeline import router as pipeline_router
 from app.config import settings
 from app.database.connection import create_all_tables
 from app.middleware import setup_middleware
+from app.services.whisper_client import whisper_client
+from dotenv import load_dotenv
+import logging
+
+load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application."""
-
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -26,14 +31,38 @@ def create_app() -> FastAPI:
 
     # Include API routes
     app.include_router(api_router)
+    
+    # Include pipeline router
+    app.include_router(pipeline_router)
 
-    # Create database tables
+    # (Removed Pollinations API key startup check)
+
+    # ── Whisper transcription route ──────────────────────────────────────────
+    @app.post("/api/transcribe")
+    async def transcribe(audio: UploadFile = File(...)):
+        """Transcrit un fichier audio en texte arabe (dialecte tunisien)."""
+        audio_bytes = await audio.read()
+        text = await whisper_client.transcribe(
+            audio_bytes=audio_bytes,
+            filename=audio.filename,
+            content_type=audio.content_type,
+        )
+        return {"transcription": text}
+
+    # ── Whisper health check ─────────────────────────────────────────────────
+    @app.get("/api/whisper/health")
+    async def whisper_health():
+        """Vérifie que le Space Whisper est actif."""
+        result = await whisper_client.health_check()
+        return result
+
+    # ── Startup ──────────────────────────────────────────────────────────────
     @app.on_event("startup")
     def startup_event() -> None:
         """Run on application startup."""
         create_all_tables()
 
-    # Root endpoint
+    # ── Root ─────────────────────────────────────────────────────────────────
     @app.get("/")
     async def root() -> dict[str, str]:
         """Root endpoint."""
@@ -43,7 +72,7 @@ def create_app() -> FastAPI:
             "docs": "/api/docs" if settings.enable_docs else "disabled",
         }
 
-    # Error handlers
+    # ── Error handlers ────────────────────────────────────────────────────────
     @app.exception_handler(Exception)
     async def generic_exception_handler(request, exc: Exception) -> JSONResponse:
         """Handle generic exceptions."""
