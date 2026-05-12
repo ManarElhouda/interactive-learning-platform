@@ -2,9 +2,10 @@
 
 import os
 from typing import Literal
-
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
+load_dotenv()
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -45,6 +46,12 @@ class Settings(BaseSettings):
 
     # Feature flags
     enable_docs: bool = True  # Swagger/OpenAPI docs
+    # Whisper ASR
+    whisper_space_url: str = "https://manarElhouda-whisper-tunisian-asr.hf.space"
+
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
+    
 
     class Config:
         env_file = ".env"

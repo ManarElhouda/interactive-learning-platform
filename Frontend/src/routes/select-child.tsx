@@ -18,6 +18,10 @@ function SelectChild() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
+  const [cognitiveLevel, setCognitiveLevel] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
+  const [colorsInput, setColorsInput] = useState("");
+  const [interestsInput, setInterestsInput] = useState("");
+  const [stylePreference, setStylePreference] = useState<"cartoon" | "watercolor" | "realistic">("cartoon");
   const [age, setAge] = useState("");
   const [avatar, setAvatar] = useState("🧒");
   const [creating, setCreating] = useState(false);
@@ -55,12 +59,21 @@ function SelectChild() {
     try {
       const child = await createChild({
         name,
+        age: parseInt(age),
+        cognitive_level: cognitiveLevel,
+        preferred_colors: colorsInput.split(",").map(s => s.trim()).filter(Boolean),
+        interests: interestsInput.split(",").map(s => s.trim()).filter(Boolean),
+        style_preference: stylePreference,
         age: age ? parseInt(age) : undefined,
         avatar,
       });
       setChildren((prev) => [...prev, child]);
       setShowCreate(false);
       setName("");
+      setCognitiveLevel("intermediate");
+      setColorsInput("");
+      setInterestsInput("");
+      setStylePreference("cartoon");
       setAge("");
       setAvatar("🧒");
     } catch {
@@ -162,6 +175,7 @@ function SelectChild() {
               <h2 className="text-xl font-bold mb-4">New learner profile</h2>
               <form onSubmit={handleCreate} className="space-y-4">
                 <div>
+                  <label className="block text-sm font-semibold mb-1.5">Prénom de l'enfant</label>
                   <label className="block text-sm font-semibold mb-1.5">Name</label>
                   <input
                     type="text"
@@ -178,29 +192,86 @@ function SelectChild() {
                     type="number"
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
-                    min={1}
-                    max={30}
+                    min={3}
+                    max={18}
+                    required
                     className="w-full rounded-2xl border border-border bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
-                    placeholder="Age"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Avatar</label>
-                  <div className="flex flex-wrap gap-2">
-                    {AVATARS.map((a) => (
-                      <button
-                        key={a}
-                        type="button"
-                        onClick={() => setAvatar(a)}
-                        className={`w-12 h-12 rounded-full text-2xl grid place-items-center transition ${
-                          avatar === a
-                            ? "bg-primary/20 ring-2 ring-primary scale-110"
-                            : "bg-white hover:bg-primary/5"
-                        }`}
-                      >
-                        {a}
-                      </button>
-                    ))}
+                  <label className="block text-sm font-semibold mb-1.5">Niveau cognitif</label>
+                  <select
+                    value={cognitiveLevel}
+                    onChange={(e) => setCognitiveLevel(e.target.value as "beginner" | "intermediate" | "advanced")}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
+                  >
+                    <option value="beginner">Débutant (3–5 ans)</option>
+                    <option value="intermediate">Intermédiaire (6–9 ans)</option>
+                    <option value="advanced">Avancé (10+ ans)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5">Couleurs préférées</label>
+                  <input
+                    type="text"
+                    value={colorsInput}
+                    onChange={(e) => setColorsInput(e.target.value)}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
+                    placeholder="ex: bleu, jaune, vert"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">Séparer par des virgules</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5">Centres d'intérêt</label>
+                  <input
+                    type="text"
+                    value={interestsInput}
+                    onChange={(e) => setInterestsInput(e.target.value)}
+                    className="w-full rounded-2xl border border-border bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
+                    placeholder="ex: animaux, sport, musique"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">Séparer par des virgules</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Style visuel</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStylePreference("cartoon")}
+                      className={`flex-1 rounded-full py-3 font-bold transition ${
+                        stylePreference === "cartoon"
+                          ? "bg-primary text-primary-foreground shadow-soft"
+                          : "bg-white border border-border hover:bg-primary/5"
+                      }`}
+                    >
+                      🎨 Cartoon
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStylePreference("watercolor")}
+                      className={`flex-1 rounded-full py-3 font-bold transition ${
+                        stylePreference === "watercolor"
+                          ? "bg-primary text-primary-foreground shadow-soft"
+                          : "bg-white border border-border hover:bg-primary/5"
+                      }`}
+                    >
+                      🖌️ Aquarelle
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStylePreference("realistic")}
+                      className={`flex-1 rounded-full py-3 font-bold transition ${
+                        stylePreference === "realistic"
+                          ? "bg-primary text-primary-foreground shadow-soft"
+                          : "bg-white border border-border hover:bg-primary/5"
+                      }`}
+                    >
+                      🖼️ Réaliste
+                    </button>
                   </div>
                 </div>
 
