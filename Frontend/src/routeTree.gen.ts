@@ -9,11 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ParentRouteImport } from './routes/parent'
-import { Route as LearnRouteImport } from './routes/learn'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SelectChildRouteImport } from './routes/select-child'
+import { Route as ParentRouteImport } from './routes/parent'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as LearnRouteImport } from './routes/learn'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LearnIndexRouteImport } from './routes/learn.index'
 import { Route as LearnWordRouteImport } from './routes/learn.word'
@@ -22,21 +22,6 @@ import { Route as LearnTalkRouteImport } from './routes/learn.talk'
 import { Route as LearnPictureRouteImport } from './routes/learn.picture'
 import { Route as LearnExercisesRouteImport } from './routes/learn.exercises'
 
-const ParentRoute = ParentRouteImport.update({
-  id: '/parent',
-  path: '/parent',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LearnRoute = LearnRouteImport.update({
-  id: '/learn',
-  path: '/learn',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -45,6 +30,21 @@ const SignupRoute = SignupRouteImport.update({
 const SelectChildRoute = SelectChildRouteImport.update({
   id: '/select-child',
   path: '/select-child',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ParentRoute = ParentRouteImport.update({
+  id: '/parent',
+  path: '/parent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LearnRoute = LearnRouteImport.update({
+  id: '/learn',
+  path: '/learn',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -87,9 +87,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/learn': typeof LearnRouteWithChildren
   '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
+  '/select-child': typeof SelectChildRoute
+  '/signup': typeof SignupRoute
   '/learn/exercises': typeof LearnExercisesRoute
   '/learn/picture': typeof LearnPictureRoute
   '/learn/talk': typeof LearnTalkRoute
@@ -100,9 +100,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
+  '/select-child': typeof SelectChildRoute
+  '/signup': typeof SignupRoute
   '/learn/exercises': typeof LearnExercisesRoute
   '/learn/picture': typeof LearnPictureRoute
   '/learn/talk': typeof LearnTalkRoute
@@ -115,9 +115,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/learn': typeof LearnRouteWithChildren
   '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
+  '/select-child': typeof SelectChildRoute
+  '/signup': typeof SignupRoute
   '/learn/exercises': typeof LearnExercisesRoute
   '/learn/picture': typeof LearnPictureRoute
   '/learn/talk': typeof LearnTalkRoute
@@ -131,9 +131,9 @@ export interface FileRouteTypes {
     | '/'
     | '/learn'
     | '/login'
-    | '/signup'
-    | '/select-child'
     | '/parent'
+    | '/select-child'
+    | '/signup'
     | '/learn/exercises'
     | '/learn/picture'
     | '/learn/talk'
@@ -144,9 +144,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
-    | '/signup'
-    | '/select-child'
     | '/parent'
+    | '/select-child'
+    | '/signup'
     | '/learn/exercises'
     | '/learn/picture'
     | '/learn/talk'
@@ -158,9 +158,9 @@ export interface FileRouteTypes {
     | '/'
     | '/learn'
     | '/login'
-    | '/signup'
-    | '/select-child'
     | '/parent'
+    | '/select-child'
+    | '/signup'
     | '/learn/exercises'
     | '/learn/picture'
     | '/learn/talk'
@@ -173,27 +173,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LearnRoute: typeof LearnRouteWithChildren
   LoginRoute: typeof LoginRoute
-  SignupRoute: typeof SignupRoute
-  SelectChildRoute: typeof SelectChildRoute
   ParentRoute: typeof ParentRoute
+  SelectChildRoute: typeof SelectChildRoute
+  SignupRoute: typeof SignupRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/parent': {
-      id: '/parent'
-      path: '/parent'
-      fullPath: '/parent'
-      preLoaderRoute: typeof ParentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -206,6 +192,20 @@ declare module '@tanstack/react-router' {
       path: '/select-child'
       fullPath: '/select-child'
       preLoaderRoute: typeof SelectChildRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parent': {
+      id: '/parent'
+      path: '/parent'
+      fullPath: '/parent'
+      preLoaderRoute: typeof ParentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/learn': {
@@ -291,9 +291,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LearnRoute: LearnRouteWithChildren,
   LoginRoute: LoginRoute,
-  SignupRoute: SignupRoute,
-  SelectChildRoute: SelectChildRoute,
   ParentRoute: ParentRoute,
+  SelectChildRoute: SelectChildRoute,
+  SignupRoute: SignupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
