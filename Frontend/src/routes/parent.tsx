@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { WORDS, AVATARS } from "@/data/words";
 import { Beyond21Logo } from "@/components/Beyond21Logo";
+import { MedicalInsights } from "@/components/MedicalInsights";
 import { useAdaptive, colorForScore } from "@/lib/adaptive";
 import { getApiUrl, setApiUrl, checkHealth } from "@/lib/api";
 
@@ -341,85 +342,7 @@ function ExercisesTab() {
 
 /* ─── Tab 4: Medical ─── */
 function Medical() {
-  const cog = [
-    { l: "Attention", v: 70, c: "var(--sky)" },
-    { l: "Memory", v: 74, c: "var(--happy)" },
-    { l: "Language", v: 71, c: "var(--bubble)" },
-    { l: "Motor", v: 75, c: "var(--peach)" },
-  ];
-  const overall = 73;
-  const risk = 22; // %
-  return (
-    <>
-      <H t="Medical Insights" s="Brain analysis & clinical indicators" />
-
-      <div className="space-y-4">
-        {/* Card 1 */}
-        <div className="bg-white rounded-3xl p-6 shadow-soft grid md:grid-cols-[200px_1fr] gap-6 items-center">
-          <div className="aspect-square rounded-full bg-gradient-to-br from-sky/40 to-bubble/40 grid place-items-center text-7xl">🧠</div>
-          <div>
-            <h3 className="font-bold text-lg">Brain Visualization</h3>
-            <div className="inline-flex items-center gap-2 mt-2 rounded-full bg-happy/40 px-3 py-1 text-sm font-bold">✅ No Anomaly Detected</div>
-            <div className="mt-3 text-xs text-muted-foreground mb-1">Detection confidence</div>
-            <div className="h-3 rounded-full bg-muted overflow-hidden"><div className="h-full bg-purple-500" style={{ width: "92%" }} /></div>
-            <div className="text-xs mt-1 font-bold">92%</div>
-            <p className="text-sm text-muted-foreground mt-2">No anomalies detected in the latest scan.</p>
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div className="bg-white rounded-3xl p-6 shadow-soft">
-          <h3 className="font-bold mb-4">Cognitive Scores</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 justify-items-center">
-            {cog.map((g) => <Gauge key={g.l} label={g.l} value={g.v} color={g.c} />)}
-          </div>
-          <div className="mt-6 rounded-2xl bg-gradient-celebrate text-white p-5 text-center">
-            <div className="text-sm opacity-90">Overall Cognitive Score</div>
-            <div className="text-4xl font-bold">{overall} / 100</div>
-          </div>
-        </div>
-
-        {/* Card 3 */}
-        <div className="bg-white rounded-3xl p-6 shadow-soft">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold">Alzheimer Risk Indicator</h3>
-            <span className="rounded-full bg-happy/40 px-3 py-1 text-sm font-bold">Low Risk</span>
-          </div>
-          <div className="relative h-5 rounded-full" style={{ background: "linear-gradient(to right, #86efac, #fde047, #fca5a5)" }}>
-            <div className="absolute -top-1 w-7 h-7 rounded-full bg-white border-4 border-foreground" style={{ left: `calc(${risk}% - 14px)` }} />
-          </div>
-          <div className="flex justify-between mt-2 text-xs font-semibold text-muted-foreground">
-            <span>Low</span><span>Moderate</span><span>Elevated</span>
-          </div>
-        </div>
-
-        {/* Card 4 */}
-        <div className="bg-white rounded-3xl p-6 shadow-soft grid md:grid-cols-[1fr_180px] gap-6">
-          <div>
-            <h3 className="font-bold mb-3">Anomaly Map</h3>
-            <div className="aspect-video rounded-2xl relative overflow-hidden grid place-items-center" style={{ background: "radial-gradient(circle at 30% 40%, #fde047 0%, transparent 30%), radial-gradient(circle at 65% 55%, #f87171 0%, transparent 25%), linear-gradient(135deg, #1e293b, #475569)" }}>
-              <span className="text-7xl opacity-40">🧠</span>
-            </div>
-            <div className="mt-3 text-sm">Anomaly score: <span className="font-bold">0.18</span> <span className="text-muted-foreground">(Low intensity)</span></div>
-          </div>
-          <div>
-            <div className="text-xs font-semibold mb-2">Intensity</div>
-            <div className="h-40 w-6 rounded-full" style={{ background: "linear-gradient(to top, #fef9c3, #fde047, #f97316, #dc2626)" }} />
-            <div className="text-xs mt-2 text-muted-foreground">Low → High</div>
-          </div>
-        </div>
-
-        {/* Card 5 */}
-        <div className="bg-white rounded-3xl p-6 shadow-soft">
-          <h3 className="font-bold mb-3">GradCAM XAI Explainability</h3>
-          <div className="aspect-video rounded-2xl relative overflow-hidden grid place-items-center" style={{ background: "radial-gradient(circle at 55% 50%, #ef4444 0%, #f97316 8%, #fde047 16%, #4ade80 24%, #22d3ee 32%, #3b82f6 40%, transparent 50%), linear-gradient(135deg, #1e293b, #475569)" }}>
-            <span className="text-7xl opacity-30">🧠</span>
-          </div>
-          <p className="mt-3 text-sm text-muted-foreground">The model focused on the <strong>temporal lobe region</strong>, which is associated with language processing.</p>
-        </div>
-      </div>
-    </>
-  );
+  return <MedicalInsights />;
 }
 
 /* ─── Tab 6: Settings ─── */

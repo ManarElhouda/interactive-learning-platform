@@ -147,3 +147,26 @@ export async function fetchVocabulary(): Promise<Array<{
   const data = await res.json();
   return data.vocabulary;
 }
+export async function analyzeMedicalImage(file: File): Promise<{
+  score: number;
+  label: string;
+  anomaly_map: string;
+  reconstruction: string;
+  gradcam: string;
+}> {
+  const base = getApiUrl() || "http://localhost:8000";
+  const form = new FormData();
+  form.append("image", file);
+
+  const res = await fetch(`${base}/api/medical/predict`, {
+    method: "POST",
+    body: form,
+    headers: HEADERS,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Medical analysis failed: ${res.status}`);
+  }
+
+  return res.json();
+}

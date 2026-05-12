@@ -17,6 +17,9 @@ import { Route as LearnRouteImport } from './routes/learn'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SelectChildRouteImport } from './routes/select-child'
+import { Route as ParentRouteImport } from './routes/parent'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as LearnRouteImport } from './routes/learn'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LearnIndexRouteImport } from './routes/learn.index'
 import { Route as LearnWordRouteImport } from './routes/learn.word'
@@ -55,14 +58,9 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SelectChildRoute = SelectChildRouteImport.update({
-  id: '/select-child',
-  path: '/select-child',
+const LearnRoute = LearnRouteImport.update({
+  id: '/learn',
+  path: '/learn',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -105,8 +103,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/learn': typeof LearnRouteWithChildren
   '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
   '/select-child': typeof SelectChildRoute
   '/signup': typeof SignupRoute
@@ -120,8 +116,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
   '/select-child': typeof SelectChildRoute
   '/signup': typeof SignupRoute
@@ -137,8 +131,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/learn': typeof LearnRouteWithChildren
   '/login': typeof LoginRoute
-  '/signup': typeof SignupRoute
-  '/select-child': typeof SelectChildRoute
   '/parent': typeof ParentRoute
   '/select-child': typeof SelectChildRoute
   '/signup': typeof SignupRoute
@@ -155,8 +147,6 @@ export interface FileRouteTypes {
     | '/'
     | '/learn'
     | '/login'
-    | '/signup'
-    | '/select-child'
     | '/parent'
     | '/select-child'
     | '/signup'
@@ -170,8 +160,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
-    | '/signup'
-    | '/select-child'
     | '/parent'
     | '/select-child'
     | '/signup'
@@ -186,8 +174,6 @@ export interface FileRouteTypes {
     | '/'
     | '/learn'
     | '/login'
-    | '/signup'
-    | '/select-child'
     | '/parent'
     | '/select-child'
     | '/signup'
@@ -203,8 +189,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LearnRoute: typeof LearnRouteWithChildren
   LoginRoute: typeof LoginRoute
-  SignupRoute: typeof SignupRoute
-  SelectChildRoute: typeof SelectChildRoute
   ParentRoute: typeof ParentRoute
   SelectChildRoute: typeof SelectChildRoute
   SignupRoute: typeof SignupRoute
@@ -245,6 +229,20 @@ declare module '@tanstack/react-router' {
       path: '/select-child'
       fullPath: '/select-child'
       preLoaderRoute: typeof SelectChildRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/parent': {
+      id: '/parent'
+      path: '/parent'
+      fullPath: '/parent'
+      preLoaderRoute: typeof ParentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/learn': {
@@ -330,8 +328,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LearnRoute: LearnRouteWithChildren,
   LoginRoute: LoginRoute,
-  SignupRoute: SignupRoute,
-  SelectChildRoute: SelectChildRoute,
   ParentRoute: ParentRoute,
   SelectChildRoute: SelectChildRoute,
   SignupRoute: SignupRoute,
