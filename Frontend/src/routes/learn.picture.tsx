@@ -52,57 +52,50 @@ function Picture() {
   }, [child]);
 
   // ── Enregistrement ────────────────────────────────────────────────────────
-  async function handleMic() {
-    if (!getApiUrl()) {
-      alert("Configure d'abord l'URL de l'API dans Parent Dashboard > Settings.");
-      return;
-    }
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 
+  "https://interactive-learning-platform-production-3b22.up.railway.app";
 
-    if (!isRecording) {
-      try {
-        setStatus("listening");
-        setResult(null);
-        setFeedbackSent(false);
-        setQuality(null);
-        setClarity(null);
-        setStyleScore(null);
-        setIsRecording(true);
-        audioChunksRef.current = [];
-
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-        mediaRecorderRef.current = recorder;
-
-        recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
-        recorder.onstop = async () => {
-          stream.getTracks().forEach((t) => t.stop());
-          setIsRecording(false);
-          await processPipeline();
-        };
-
-        recorder.start();
-      } catch {
-        setStatus("fail");
-        setErrorMsg("Microphone inaccessible.");
+async function handleMic() {
+  // Supprime le check getApiUrl() — on utilise Railway directement
+  if (!isRecording) {
+    try {
+      setStatus("listening");
+      setResult(null);
+      setFeedbackSent(false);
+      setQuality(null);
+      setClarity(null);
+      setStyleScore(null);
+      setIsRecording(true);
+      audioChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
         setIsRecording(false);
-      }
-    } else {
-      mediaRecorderRef.current?.stop();
+        await processPipeline();
+      };
+      recorder.start();
+    } catch {
+      setStatus("fail");
+      setErrorMsg("Microphone inaccessible.");
+      setIsRecording(false);
     }
+  } else {
+    mediaRecorderRef.current?.stop();
   }
-
+}
   // ── Pipeline audio → image ────────────────────────────────────────────────
   async function processPipeline() {
     setStatus("processing");
-
     try {
       const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-      const base = getApiUrl();
 
       const form = new FormData();
       form.append("audio", audioBlob, "recording.webm");
 
-      const transcribeRes = await fetch(`${base}/api/transcribe`, {
+      const transcribeRes = await fetch(`${BACKEND_URL}/api/transcribe`, {
         method: "POST",
         body: form,
         headers: { "ngrok-skip-browser-warning": "true" },
