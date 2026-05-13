@@ -124,4 +124,22 @@ Deployment in real environments
 Larger datasets
 Improved personalization
 Clinical validation
-Contributors: Shetech
+## 🌐 Live Demo
+
+Our platform is available online and accessible through Railway:
+
+🔗 [Visit our website]([TON_LIEN_RAILWAY](https://frontend-production-ce37.up.railway.app/)
+
+---
+
+## 💡 About the Project
+
+This project was developed with passion and dedication to create an inclusive educational experience for children with Down syndrome.
+
+We hope our solution can make learning more engaging, interactive, and accessible for every child.
+
+---
+
+## 👨‍💻 Team
+
+Developed by our team as part of our academic and innovation journey.
