@@ -54,7 +54,8 @@ def translate_to_english(arabic_text: str, profile_ctx: str = "") -> dict:
         "- NEVER include words from the blacklist\n"
         "- Keep the English translation short (max 10 words) and visual"
     )
-    
+    arabic_text = arabic_text.encode('utf-8').decode('utf-8')
+    profile_ctx = profile_ctx.encode('utf-8').decode('utf-8') if profile_ctx else ""
     t0 = time.time()
     try:
         resp = groq_client.chat.completions.create(
@@ -140,7 +141,9 @@ def build_image_prompt(
         "- Keep scene simple, joyful, child-safe\n"
         "- Return ONLY JSON with keys: 'prompt' and 'negative_prompt', no other text"
     )
-    
+    english_description = english_description.encode('utf-8').decode('utf-8')
+    profile_ctx = profile_ctx.encode('utf-8').decode('utf-8') if profile_ctx else ""
+    style_suffix = style_suffix.encode('utf-8').decode('utf-8') if style_suffix else ""
     t0 = time.time()
     try:
         resp = groq_client.chat.completions.create(
