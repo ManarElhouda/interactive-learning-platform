@@ -1,4 +1,11 @@
 """Main FastAPI application."""
+import sys
+import io
+
+# Force UTF-8 encoding for all output (Railway fix)
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from app.api.routes import api_router
@@ -9,7 +16,12 @@ from app.middleware import setup_middleware
 from app.services.whisper_client import whisper_client
 from dotenv import load_dotenv
 import logging
-
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+    encoding='utf-8'  # ← ajouter ça
+)
 load_dotenv()
 
 logger = logging.getLogger(__name__)
