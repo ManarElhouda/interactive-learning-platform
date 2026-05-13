@@ -1,24 +1,25 @@
 /**
  * imageService.ts
- * ───────────────
  * Appels au backend FastAPI pour le pipeline Speech-to-Vision.
- * À placer dans : src/lib/imageService.ts
  */
 
-import { getApiUrl } from "./api";
-
 const HEADERS = { "ngrok-skip-browser-warning": "true" };
+
+// URL Railway backend — fixe, pas besoin de configuration manuelle
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  "https://interactive-learning-platform-production-3b22.up.railway.app";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface FullPipelineResponse {
-  transcription: string;   // texte arabe tunisien (Whisper)
-  french: string;          // traduction intermédiaire FR
-  english: string;         // traduction finale EN
-  prompt: string;          // prompt SDXL enrichi
+  transcription: string;
+  french: string;
+  english: string;
+  prompt: string;
   negative_prompt: string;
-  image_b64: string;       // image PNG en base64
-  image_url: string;       // URL Pollinations (debug)
+  image_b64: string;
+  image_url: string;
   latency_translation: number;
   latency_prompt: number;
   latency_image: number;
@@ -26,34 +27,16 @@ export interface FullPipelineResponse {
   status: string;
 }
 
-export interface FeedbackRequest {
-  child_id: string;
-  transcription: string;
-  translation: string;
-  prompt: string;
-  feedback: "positive" | "neutral" | "negative";
-  feedback_note?: string;
-}
-
-// ── Pipeline complet : transcription → traduction → image ─────────────────────
+// ── Pipeline complet ───────────────────────────────────────────────────────────
 
 export async function runFullPipeline(
   transcription: string,
   childId: string = "child_001"
 ): Promise<FullPipelineResponse> {
-  const base = getApiUrl();
-  if (!base) throw new Error("API URL non configurée — va dans Parent Dashboard > Settings");
-
-  const res = await fetch(`${base}/api/pipeline/full`, {
+  const res = await fetch(`${BACKEND_URL}/api/pipeline/full`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...HEADERS,
-    },
-    body: JSON.stringify({
-      transcription,
-      child_id: childId,
-    }),
+    headers: { "Content-Type": "application/json", ...HEADERS },
+    body: JSON.stringify({ transcription, child_id: childId }),
   });
 
   if (!res.ok) {
@@ -62,19 +45,6 @@ export async function runFullPipeline(
   }
 
   return res.json();
-}
-
-// ── Feedback utilisateur ──────────────────────────────────────────────────────
-
-export async function sendFeedback(feedback: FeedbackRequest): Promise<void> {
-  const base = getApiUrl();
-  if (!base) return;
-
-  await fetch(`${base}/api/pipeline/feedback`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...HEADERS },
-    body: JSON.stringify(feedback),
-  }).catch(() => {});   // feedback non bloquant
 }
 
 // ── Utilitaire ────────────────────────────────────────────────────────────────
