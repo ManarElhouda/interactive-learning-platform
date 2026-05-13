@@ -128,7 +128,7 @@ Clinical validation
 
 Our platform is available online and accessible through Railway:
 
-🔗 [Visit our website]([TON_LIEN_RAILWAY](https://frontend-production-ce37.up.railway.app/)
+🔗 [Visit our website]([NOTRE_LIEN_RAILWAY](https://frontend-production-ce37.up.railway.app/)
 
 ---
 
