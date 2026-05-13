@@ -1,4 +1,4 @@
-"""FastAPI router for Speech-to-Vision pipeline."""
+﻿"""FastAPI router for Speech-to-Vision pipeline."""
 import asyncio
 import logging
 from fastapi import APIRouter, HTTPException
@@ -110,7 +110,7 @@ async def full_pipeline(request: PipelineRequest):
     try:
         # Load child profile
         profile = profile_service.get_profile(request.child_id)
-        logger.info(f"Processing for child: {profile.name}")
+        logger.info("Processing pipeline for child_id: %s", child_id)
         
         # Build profile context
         profile_ctx = profile_service.build_system_prompt_context(profile)
@@ -164,7 +164,7 @@ async def full_pipeline(request: PipelineRequest):
             status="success"
         )
         
-        logger.info(f"Full pipeline completed for child {profile.name} (total: {latency_total:.2f}s)")
+        logger.info("Full pipeline completed in %.2fs", latency_total)
         return response
         
     except Exception as e:
@@ -188,7 +188,7 @@ async def submit_feedback(request: FeedbackRequest):
         }
         profile_service.save_interaction(request.child_id, interaction)
 
-        # Mettre à jour le profil selon les 3 scores
+        # Mettre Ã  jour le profil selon les 3 scores
         profile_updated = profile_service.update_profile_from_feedback(
             child_id=request.child_id,
             translation=request.translation,
@@ -200,11 +200,11 @@ async def submit_feedback(request: FeedbackRequest):
         return FeedbackResponse(
             status="ok",
             profile_updated=profile_updated,
-            message=f"Feedback enregistré (Q:{request.quality_score} C:{request.clarity_score} S:{request.style_score})"
+            message=f"Feedback enregistrÃ© (Q:{request.quality_score} C:{request.clarity_score} S:{request.style_score})"
         )
 
     except Exception as e:
-        logger.error(f"Feedback error: {str(e)}")
+        logger.error("Feedback error: %s", str(e).encode("ascii","replace").decode())
         raise HTTPException(status_code=500, detail=f"Feedback error: {str(e)}")
     
 @router.get("/profile/{child_id}", response_model=UserProfile)
@@ -223,7 +223,7 @@ async def get_profile(child_id: str):
         logger.info(f"Profile retrieved: {child_id}")
         return profile
     except Exception as e:
-        logger.error(f"Error retrieving profile: {str(e)}")
+        logger.error("Error retrieving profile")
         raise HTTPException(status_code=404, detail=f"Profile not found: {child_id}")
 
 
@@ -257,5 +257,6 @@ async def update_profile(child_id: str, updates: dict):
         return profile
         
     except Exception as e:
-        logger.error(f"Error updating profile: {str(e)}")
+        logger.error("Error updating profile")
         raise HTTPException(status_code=500, detail=f"Error updating profile: {str(e)}")
+
